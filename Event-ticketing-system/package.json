@@ -1,0 +1,8 @@
+{
+  "devDependencies": {
+    "truffle": "^5.5.29"
+  },
+  "dependencies": {
+    "openzeppelin-solidity": "4.6.0"
+  }
+}
