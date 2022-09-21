@@ -3,6 +3,7 @@
     "truffle": "^5.5.29"
   },
   "dependencies": {
+    "@openzeppelin/contracts": "^4.7.3",
     "openzeppelin-solidity": "4.6.0"
   }
 }
