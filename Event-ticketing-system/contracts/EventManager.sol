@@ -22,8 +22,10 @@ contract EventManager is ERC1155{
     }
 
     mapping(uint => Event) public events; // id => event
+    mapping(uint => string) public idToIpfsHash; // id => hash
     // Event[] public events;
     uint public eventsCount;
+    uint public counter = 0;
 
     event EventCreated(address _address);
 
@@ -31,20 +33,28 @@ contract EventManager is ERC1155{
     constructor() public ERC1155("https://game.example/api/item/{id}.json") {
     }
 
-    function createEvent(address to, uint256[] memory ids, uint256[] memory amounts, uint256[] memory prices) public {
+    function createEvent(address to, string memory eventHash, string[] memory ticketHashes,/*string[] memory ids,*/ uint256[] memory amounts, uint256[] memory prices) public {
 
+        counter++;
         // mint event
-        _mint(to, eventsCount, 1, "");
+        _mint(to, counter, 1, "");
+        idToIpfsHash[counter] = eventHash;
+        // eventsCount++;
+        Event storage newEvent = events[counter];
+        newEvent.eventId = counter;
+
+        uint[] memory ids = new uint[](ticketHashes.length);
+        for (uint i=0; i < ticketHashes.length; i++) {
+            counter++;
+            newEvent.tickets[counter] = Ticket(newEvent.eventId, counter, amounts[i], prices[i]);
+            ids[i] = counter;
+            if(keccak256(abi.encodePacked(ticketHashes[i])) != keccak256(abi.encodePacked(""))){
+                idToIpfsHash[counter] = ticketHashes[i];
+            }
+        }
+        
         // mint tickets
         _mintBatch(to, ids, amounts, "");
-
-        eventsCount++;
-        Event storage newEvent = events[eventsCount];
-        newEvent.eventId = eventsCount;
-
-        for (uint i=0; i < ids.length; i++) {
-            newEvent.tickets[ids[i]] = Ticket(eventsCount, ids[i], amounts[i], prices[i]);
-        }
 
     }
 
@@ -92,27 +102,28 @@ contract EventManager is ERC1155{
     //editEventInfo() // maybe edit from metadata
 
     // addTickets()
-    function addTickets(uint eventId, address to, uint256[] memory ids, uint256[] memory amounts, uint256[] memory prices) public {
+    function addTickets(uint eventId, address to, /*string[] memory ids,*/ uint256[] memory amounts, uint256[] memory prices) public {
         
-        // mint tickets
-        _mintBatch(to, ids, amounts, "");
 
         Event storage currEvent = events[eventId];
 
         // check if there is such ticket id
-        for (uint i=0; i < ids.length; i++) {
-            currEvent.tickets[ids[i]] = Ticket(eventsCount, ids[i], amounts[i], prices[i]);
+        
+        uint[] memory ids = new uint[](amounts.length);
+        for (uint i=0; i < amounts.length; i++) {
+            counter++;
+            currEvent.tickets[counter] = Ticket(currEvent.eventId, ids[i], amounts[i], prices[i]);
+            ids[i] = counter;
         }
+        
+        // mint tickets
+        _mintBatch(to, ids, amounts, "");
+        // for (uint i=0; i < amounts.length; i++) {
+        //     counter++;
+        //     newEvent.tickets[counter] = Ticket(newEvent.eventId, counter, amounts[i], prices[i]);
+        //     ids[i] = counter;
+        // }
     }
     //setTicketForSale()
-
-
-
-
-
-
-
-
-
 
 }
