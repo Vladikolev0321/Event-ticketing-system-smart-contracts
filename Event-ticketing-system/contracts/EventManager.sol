@@ -7,10 +7,7 @@ contract EventManager is ERC1155{
 
     struct Event {
         uint eventId;
-        // mapping(uint => uint) ticketIdsAmounts;
-        // uint[] ticketIds;
-        // uint[] ticketAmounts;
-        // Ticket[] tickets;
+        uint[] ticketIds;
         mapping(uint => Ticket) tickets;
     }
 
@@ -19,15 +16,22 @@ contract EventManager is ERC1155{
         uint ticketId;
         uint amount;
         uint price;
+        bool isBought;
     }
 
     mapping(uint => Event) public events; // id => event
+    mapping(uint => Ticket) public tickets; // id => ticket
     mapping(uint => string) public idToIpfsHash; // id => hash
-    // Event[] public events;
+    mapping(uint => address) private ticketidToOwner; 
+    uint[] public eventsIds;
+    uint[] public ticketsIds;
+
     uint public eventsCount;
+    uint public ticketsCount;
     uint public counter = 0;
 
-    event EventCreated(address _address);
+    event EventCreated(uint eventId);
+    event BoughtTickets();
 
 
     constructor() public ERC1155("https://game.example/api/item/{id}.json") {
@@ -39,15 +43,28 @@ contract EventManager is ERC1155{
         // mint event
         _mint(to, counter, 1, "");
         idToIpfsHash[counter] = eventHash;
-        // eventsCount++;
         Event storage newEvent = events[counter];
         newEvent.eventId = counter;
+        eventsIds.push(counter);
+        eventsCount++;
 
         uint[] memory ids = new uint[](ticketHashes.length);
         for (uint i=0; i < ticketHashes.length; i++) {
             counter++;
-            newEvent.tickets[counter] = Ticket(newEvent.eventId, counter, amounts[i], prices[i]);
+            Ticket storage ticket = tickets[counter];
+            ticket.eventId = newEvent.eventId;
+            ticket.ticketId = counter;
+            ticket.amount = amounts[i];
+            ticket.price = prices[i];
+            ticket.isBought = false;
+            newEvent.tickets[counter] = ticket;
             ids[i] = counter;
+            ticketsIds.push(counter);
+            //
+            newEvent.ticketIds.push(counter);
+            ticketidToOwner[counter] = to;
+            //
+            ticketsCount++;
             if(keccak256(abi.encodePacked(ticketHashes[i])) != keccak256(abi.encodePacked(""))){
                 idToIpfsHash[counter] = ticketHashes[i];
             }
@@ -56,21 +73,18 @@ contract EventManager is ERC1155{
         // mint tickets
         _mintBatch(to, ids, amounts, "");
 
+        emit EventCreated(newEvent.eventId);
+
     }
 
     function getEventInfo(uint eventId, uint ticketId) public view returns(uint){
-        // return (events[eventId].ticketIds, events[eventId].ticketAmounts);
         return (events[eventId].tickets[ticketId].amount);
     }
 
     //buyTicket()
     function buyTicket(address ownerOfTickets, uint ticketId, uint amount, uint price) external payable {
         require(msg.sender != ownerOfTickets, "Seller cannot be buyer");
-		// require(listing.status == ListingStatus.Active, "Listing is not active");
-
 		require(msg.value >= amount*price, "Insufficient payment");
-
-		// listing.status = ListingStatus.Sold;
 
         _safeTransferFrom(ownerOfTickets, msg.sender, ticketId, amount, ""); 
 
@@ -79,11 +93,11 @@ contract EventManager is ERC1155{
     }
 
     // buyTickets()
-    function buyTickets(address[] memory ownersOfTickets, uint[] memory ticketIds, uint256[] memory amounts, uint256[] memory prices) external payable {
-        // safeTransferFrom(address from, msg.sender, uint256 id, uint256 amount, "");
+    function buyTickets( uint[] memory ticketIds, uint256[] memory amounts, uint256[] memory prices) external payable {
         uint amountToPay;
         for(uint i=0; i < ticketIds.length; i++){
-            require(msg.sender != ownersOfTickets[i], "Seller cannot be buyer");
+            require(msg.sender != ticketidToOwner[ticketIds[i]], "Seller cannot be buyer");
+
             amountToPay += amounts[i]*prices[i];
         }
 
@@ -91,20 +105,27 @@ contract EventManager is ERC1155{
 
         for(uint i=0; i < ticketIds.length; i++){
             
-            _safeTransferFrom(ownersOfTickets[i], msg.sender, ticketIds[i], amounts[i], "");
-
-		    payable(ownersOfTickets[i]).transfer(prices[i]*amounts[i]);
+            _safeTransferFrom(ticketidToOwner[ticketIds[i]], msg.sender, ticketIds[i], amounts[i], "");
+		    payable(ticketidToOwner[ticketIds[i]]).transfer(prices[i]*amounts[i]);
+            Ticket storage currTicket = tickets[ticketIds[i]];
+            currTicket.amount--;
+            if(currTicket.amount == 0){ 
+                currTicket.isBought = true;
+            }
         }
-
+        emit BoughtTickets();
 
     }
 
-    //editEventInfo() // maybe edit from metadata
+    //editEventInfo() // edit metadata
+    function editInfo(uint eventId, string memory ipfsHash) public {
+        uint balance = balanceOf(msg.sender, eventId);
+        require(balance == 1, "Only owner can edit event info");
+        idToIpfsHash[eventId] = ipfsHash;
+    }
 
     // addTickets()
     function addTickets(uint eventId, address to, /*string[] memory ids,*/ uint256[] memory amounts, uint256[] memory prices) public {
-        
-
         Event storage currEvent = events[eventId];
 
         // check if there is such ticket id
@@ -112,18 +133,39 @@ contract EventManager is ERC1155{
         uint[] memory ids = new uint[](amounts.length);
         for (uint i=0; i < amounts.length; i++) {
             counter++;
-            currEvent.tickets[counter] = Ticket(currEvent.eventId, ids[i], amounts[i], prices[i]);
+            currEvent.tickets[counter] = Ticket(currEvent.eventId, ids[i], amounts[i], prices[i], false);
             ids[i] = counter;
         }
-        
-        // mint tickets
         _mintBatch(to, ids, amounts, "");
-        // for (uint i=0; i < amounts.length; i++) {
-        //     counter++;
-        //     newEvent.tickets[counter] = Ticket(newEvent.eventId, counter, amounts[i], prices[i]);
-        //     ids[i] = counter;
-        // }
     }
     //setTicketForSale()
+
+
+    // uri()
+    function uri(uint256 id) public view virtual override returns (string memory) {
+        return (
+            string(abi.encodePacked("https://ipfs.moralis.io:2053/ipfs/", idToIpfsHash[id]))
+        );
+    }
+
+    function getEventTickets(uint eventId) public view returns(uint[] memory, uint[] memory, uint[] memory, bool[] memory){
+        Event storage currEvent = events[eventId];
+        uint[] memory ticketIds = currEvent.ticketIds;
+        uint[] memory amounts = new uint[](currEvent.ticketIds.length);
+        uint[] memory prices = new uint[](currEvent.ticketIds.length);
+        bool[] memory areBought = new bool[](currEvent.ticketIds.length);
+        for(uint i=0; i < currEvent.ticketIds.length; i++){
+            Ticket storage currTicket = tickets[currEvent.ticketIds[i]];
+            amounts[i] = currTicket.amount;
+            prices[i] = currTicket.price;
+            areBought[i] = currTicket.isBought;
+        }
+        return (ticketIds, amounts, prices, areBought);
+    }
+
+    function getTicketInfo(uint ticketId) public view returns(uint, uint, uint){
+        Ticket storage currTicket = tickets[ticketId];
+        return (currTicket.eventId, currTicket.amount, currTicket.price);
+    }
 
 }
