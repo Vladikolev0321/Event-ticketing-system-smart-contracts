@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 import "../libraries/LibEventStorage.sol";
 
-contract Test1Facet is ERC1155{
+contract EventManagerFacet is ERC1155{
     event TestEvent(address something);
     event EventCreated(uint eventId);
     event BoughtTickets(address buyer);
@@ -12,6 +12,26 @@ contract Test1Facet is ERC1155{
     AppStorage internal s;
 
     constructor() public ERC1155("https://game.example/api/item/{id}.json") {
+    }
+
+    function getCounter() public view returns(uint){
+        return s.counter;
+    }
+
+    function getEventsCount() public view returns(uint){
+        return s.eventsCount;
+    }
+
+    function getEventId(uint index) public view returns(uint){
+        return s.eventsIds[index];
+    }
+
+    function getTicketsCount() public view returns(uint){
+        return s.ticketsCount;
+    }
+
+    function getTicketId(uint index) public view returns(uint){
+        return s.ticketsIds[index];
     }
 
     function createEvent(address to, string memory eventHash, string[] memory ticketHashes,/*string[] memory ids,*/ uint256[] memory amounts, uint256[] memory prices) public {
@@ -120,8 +140,11 @@ contract Test1Facet is ERC1155{
 
     // uri()
     function uri(uint256 id) public view virtual override returns (string memory) {
+        // return (
+        //     string(abi.encodePacked("https://ipfs.moralis.io:2053/ipfs/", s.idToIpfsHash[id]))
+        // );
         return (
-            string(abi.encodePacked("https://ipfs.moralis.io:2053/ipfs/", s.idToIpfsHash[id]))
+            s.idToIpfsHash[id]
         );
     }
 

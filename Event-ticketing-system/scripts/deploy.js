@@ -1,7 +1,7 @@
 /* global ethers */
 /* eslint prefer-const: "off" */
 
-const { getSelectors, FacetCutAction } = require('./libraries/diamond.js')
+const { getSelectors, FacetCutAction, remove } = require('./libraries/diamond.js')
 
 async function deployDiamond () {
   const accounts = await ethers.getSigners()
@@ -33,8 +33,8 @@ async function deployDiamond () {
   const FacetNames = [
     'DiamondLoupeFacet',
     'OwnershipFacet',
-    'Test1Facet',
-    'Test2Facet',
+    'EventManagerFacet',
+    'DEXFacet',
   ]
   const cut = []
   for (const FacetName of FacetNames) {
@@ -42,11 +42,13 @@ async function deployDiamond () {
     const facet = await Facet.deploy()
     await facet.deployed()
     console.log(`${FacetName} deployed: ${facet.address}`)
+    // console.log('Selectors:', getSelectors(facet)[11]);
     cut.push({
       facetAddress: facet.address,
       action: FacetCutAction.Add,
       functionSelectors: getSelectors(facet)
     })
+    // remove(['supportsInterface(bytes4)']);
   }
 
   // upgrade diamond with facets

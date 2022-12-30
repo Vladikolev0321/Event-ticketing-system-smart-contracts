@@ -6,7 +6,7 @@ const FacetCutAction = { Add: 0, Replace: 1, Remove: 2 }
 function getSelectors (contract) {
   const signatures = Object.keys(contract.interface.functions)
   const selectors = signatures.reduce((acc, val) => {
-    if (val !== 'init(bytes)') {
+    if (val !== 'init(bytes)' && val !== 'supportsInterface(bytes4)') {
       acc.push(contract.interface.getSighash(val))
     }
     return acc

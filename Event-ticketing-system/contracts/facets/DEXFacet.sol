@@ -5,7 +5,7 @@ import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 import "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
 import "../libraries/LibEventStorage.sol";
 
-contract Test2Facet is ERC1155Holder{
+contract DEXFacet is ERC1155Holder{
 
     event Listed(
 		uint listingId,
@@ -24,6 +24,10 @@ contract Test2Facet is ERC1155Holder{
 	);
 
     AppStorage internal s;
+
+	function getListingsCount() public view returns(uint) {
+		return s.listingCount;
+	}
 
     //listTicket()
     function listTicket(address token, uint tokenId, uint amount, uint price) external {
